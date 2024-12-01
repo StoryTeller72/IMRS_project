@@ -1,8 +1,9 @@
 import copy
-import numpy
+import numpy as np
 import torch
 import torch.nn as nn
 import random
+from Noise import OUNoise
 from collections import deque
 
 
@@ -42,7 +43,7 @@ class Critic(nn.Module):
 
 
 class DDPG():
-    def __init__(self, observation_space_dim,  action_space_dim, buffer_size, polyak, bath_size, actor_lr, critic_lr, gamma, noise_decrease, noise_scaler=1.0, noise_mean=0, noise_std=0.1):
+    def __init__(self, observation_space_dim,  action_space_dim, noise_decrease, polyak=1e-2, bath_size=512, actor_lr=1e-3, critic_lr=1e-3, gamma=0.99, noise_scaler=1.0, mu=0, theta=0.15, sigma=0.3,  buffer_size=15_000):
         self.observation_dim = observation_space_dim
         self.action_dim = action_space_dim
         self.buffer_size = buffer_size
@@ -60,19 +61,21 @@ class DDPG():
         self.noise_scaler = noise_scaler
         self.noise_decrease = noise_decrease
 
-        self.noise_mean = noise_mean
-        self.noise_std = noise_std
+        self.mu = mu
+        self.theta = theta
+        self.sigma = sigma
+
         self.gamma = gamma
+        self.noise = OUNoise(self.action_dim, self.mu, self.theta, self.sigma)
         self.q_optimizer = torch.optim.Adam(
             self.Q_fun.parameters(), lr=critic_lr)
-        self.pi_optimizer = torch.optim.Adam(
+        self.policy_optimizer = torch.optim.Adam(
             self.policy.parameters(), lr=actor_lr)
 
     def get_action(self, state):
         pred_action = self.policy(torch.FloatTensor(state))
         action = pred_action + self.noise_scaler * \
-            torch.normal(self.noise_mean, self.noise_std,
-                         size=(self.action_dim))
+            torch.FloatTensor(self.noise.sample())
         self.noise_scaler = max(0, self.noise_decrease - self.noise_decrease)
         return torch.clamp(action, -1.0, 1.0)
 
@@ -97,20 +100,22 @@ class DDPG():
             done = done.reshape(self.bath_size, 1)
 
             # Calculate Loss for critic (Q_function) and update
-            pred_next_action = self.policy_target(next_states)
+            pred_next_actions = self.policy_target(next_states)
             next_states_and_actions = torch.cat(
-                (next_state, pred_next_action), dim=1)
+                (next_states, pred_next_actions), dim=1)
             targets = rewards + self.gamma * \
                 (1 - done) * self.Q_fun_target(next_states_and_actions)
             states_and_action = torch.cat((states, actions), dim=1)
 
             Q_loss = torch.mean(
                 (targets.detach() - self.Q_fun(states_and_action))**2)
-            self.update(self.Q_fun_target, self.Q_fun, self.op, Q_loss)
+            self.update(self.Q_fun_target, self.Q_fun,
+                        self.q_optimizer, Q_loss)
 
             # Calculate Loss for actor(policy) and update
             pred_action = self.policy(states)
             states_and_pred_actions = torch.cat((states, pred_action), dim=1)
             policy_loss = -torch.mean(self.Q_fun(states_and_pred_actions))
 
-            self.update()
+            self.update(self.policy_target, self.policy,
+                        self.policy_optimizer, policy_loss)
