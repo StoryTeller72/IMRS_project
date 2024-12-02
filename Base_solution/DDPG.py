@@ -43,12 +43,13 @@ class Critic(nn.Module):
 
 
 class DDPG():
-    def __init__(self, observation_space_dim,  action_space_dim, noise_decrease, polyak=1e-2, bath_size=512, actor_lr=1e-3, critic_lr=1e-3, gamma=0.99, noise_scaler=1.0, mu=0, theta=0.15, sigma=0.3,  buffer_size=15_000):
+    def __init__(self, observation_space_dim,  action_space_dim, noise_decrease, start_learning=80, polyak=1e-2, bath_size=512, actor_lr=1e-3, critic_lr=1e-3, gamma=0.99, noise_scaler=1.0, mu=0, theta=0.15, sigma=0.3,  buffer_size=15_000):
         self.observation_dim = observation_space_dim
         self.action_dim = action_space_dim
         self.buffer_size = buffer_size
         self.experience_buffer = deque(maxlen=self.buffer_size)
         self.bath_size = bath_size
+        self.start_learning = start_learning
 
         self.policy = Actor(self.observation_dim, self.action_dim)
         self.policy_target = copy.deepcopy(self.policy)
@@ -87,12 +88,12 @@ class DDPG():
             target_param.data.copy_(
                 (1 - self.polyak) * target_param.data + self.polyak * param.data)
 
-    def fit(self, state, action, reward, done, next_state):
+    def fit(self, state, action, reward, done, next_state, step):
         self.experience_buffer.append(
             (state, action, reward, done, next_state))
 
-        if len(self.experience_buffer) > self.bath_size:
-            bath = random.sample(self.experience_buffer, self.bath_size)
+        if step > self.start_learning:
+            bath = random.choices(self.experience_buffer, k=self.bath_size)
             # Get samples from experience buffer
             states, actions, rewards, done, next_states = map(
                 torch.FloatTensor, zip(*bath))
@@ -119,3 +120,4 @@ class DDPG():
 
             self.update(self.policy_target, self.policy,
                         self.policy_optimizer, policy_loss)
+            return Q_loss, policy_loss
