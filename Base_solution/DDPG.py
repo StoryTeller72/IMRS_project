@@ -5,6 +5,7 @@ import torch.nn as nn
 import random
 from Noise import OUNoise
 from collections import deque
+import os
 
 
 class Actor(nn.Module):
@@ -43,7 +44,7 @@ class Critic(nn.Module):
 
 
 class DDPG():
-    def __init__(self, observation_space_dim,  action_space_dim, noise_decrease, start_learning=80, polyak=1e-2, bath_size=512, actor_lr=1e-3, critic_lr=1e-3, gamma=0.99, noise_scaler=1.0, mu=0, theta=0.15, sigma=0.3,  buffer_size=15_000):
+    def __init__(self, observation_space_dim,  action_space_dim, noise_decrease, start_learning=80, write_intervals=80, checkpoint_interval=100, polyak=1e-2, bath_size=512, actor_lr=1e-3, critic_lr=1e-3, gamma=0.99, noise_scaler=1.0, mu=0, theta=0.15, sigma=0.3,  buffer_size=15_000):
         self.observation_dim = observation_space_dim
         self.action_dim = action_space_dim
         self.buffer_size = buffer_size
@@ -120,4 +121,5 @@ class DDPG():
 
             self.update(self.policy_target, self.policy,
                         self.policy_optimizer, policy_loss)
-            return Q_loss, policy_loss
+            return (policy_loss, Q_loss)
+        return (None, None)

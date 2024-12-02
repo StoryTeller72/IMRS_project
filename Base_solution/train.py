@@ -5,10 +5,13 @@ import gymnasium as gym
 import panda_gym
 import time
 import datetime
+import torch
+from torch.utils.tensorboard import SummaryWriter
+writer = SummaryWriter("Base_solution/runs")
 
 
 bath_size = 4096
-episode_n = 50
+episode_n = 2_000
 trajectory_len = 50
 start_learning = 80
 write_episode_interval = 10
@@ -24,7 +27,6 @@ log_data = {'Total_reward': []}
 cur_episode = 0
 step = 0
 current_time = datetime.datetime.now()
-f = open(f"Base_solution/runs/{current_time}.txt", "a")
 
 for episode in range(episode_n):
     total_reward = 0
@@ -36,14 +38,24 @@ for episode in range(episode_n):
             action)
         total_reward += reward
 
-        agent.fit(observation['observation'], action, reward,
-                  terminated, next_observation['observation'], step)
+        policy_loss, Q_los = agent.fit(observation['observation'], action, reward,
+                                       terminated, next_observation['observation'], step)
 
         step += 1
         observation = next_observation
     cur_episode += 1
     log_data['Total_reward'].append(total_reward)
     if cur_episode % write_episode_interval == 0:
-        f.write(f'{cur_episode} {max(log_data['Total_reward'])} {min(log_data["Total_reward"])} {
-                sum(log_data['Total_reward']) / len(log_data["Total_reward"])}\n')
-f.close()
+        writer.add_scalar('Max_reward', max(log_data['Total_reward']), step)
+        writer.add_scalar('Min_reward', min(log_data['Total_reward']), step)
+        writer.add_scalar('Mean_reward', sum(
+            log_data['Total_reward']) / len(log_data['Total_reward']), step)
+        log_data['Total_reward'] = []
+        if policy_loss and Q_los:
+            writer.add_scalar('Q_loss', Q_los, step)
+            writer.add_scalar('Pi_Loss', policy_loss, step)
+        writer.flush()
+    print(total_reward)
+writer.close()
+# f.write(f'{cur_episode} {max(log_data['Total_reward'])} {min(log_data["Total_reward"])} {
+#         sum(log_data['Total_reward']) / len(log_data["Total_reward"])}\n')
