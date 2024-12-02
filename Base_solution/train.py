@@ -1,3 +1,4 @@
+import os
 from collections import deque
 import random
 from DDPG import DDPG
@@ -7,14 +8,19 @@ import time
 import datetime
 import torch
 from torch.utils.tensorboard import SummaryWriter
+
+
+current_time = datetime.datetime.now()
 writer = SummaryWriter("Base_solution/runs")
+directory_name = f"Base_solution/DDPG_checkpoints/{current_time}"
+os.makedirs(directory_name)
 
 
 bath_size = 4096
 episode_n = 2_000
 trajectory_len = 50
 start_learning = 80
-write_episode_interval = 10
+checkpoint_episode_interval = 2
 
 env = gym.make('PandaReachDense-v3')
 # env = gym.make('PandaReachDense-v3')
@@ -26,7 +32,7 @@ log_data = {'Total_reward': []}
 
 cur_episode = 0
 step = 0
-current_time = datetime.datetime.now()
+
 
 for episode in range(episode_n):
     total_reward = 0
@@ -45,17 +51,24 @@ for episode in range(episode_n):
         observation = next_observation
     cur_episode += 1
     log_data['Total_reward'].append(total_reward)
-    if cur_episode % write_episode_interval == 0:
-        writer.add_scalar('Max_reward', max(log_data['Total_reward']), step)
-        writer.add_scalar('Min_reward', min(log_data['Total_reward']), step)
-        writer.add_scalar('Mean_reward', sum(
+    if cur_episode % checkpoint_episode_interval == 0:
+        writer.add_scalar('Max_total_reward', max(
+            log_data['Total_reward']), step)
+        writer.add_scalar('Min_total_reward', min(
+            log_data['Total_reward']), step)
+        writer.add_scalar('Mean_total_reward', sum(
             log_data['Total_reward']) / len(log_data['Total_reward']), step)
         log_data['Total_reward'] = []
         if policy_loss and Q_los:
             writer.add_scalar('Q_loss', Q_los, step)
             writer.add_scalar('Pi_Loss', policy_loss, step)
         writer.flush()
+        torch.save({
+            'policy_model': agent.policy.state_dict(),
+            'target_policy_model': agent.policy_target.state_dict(),
+            'Q_fun_model': agent.Q_fun.state_dict(),
+            'Q_fun_target_model': agent.Q_fun_target.state_dict()
+
+        }, directory_name + '/episode' + str(cur_episode))
     print(total_reward)
 writer.close()
-# f.write(f'{cur_episode} {max(log_data['Total_reward'])} {min(log_data["Total_reward"])} {
-#         sum(log_data['Total_reward']) / len(log_data["Total_reward"])}\n')
