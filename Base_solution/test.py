@@ -5,16 +5,7 @@ from DDPG import DDPG
 import gymnasium as gym
 import panda_gym
 import time
-import datetime
-import torch
 import numpy as np
-from torch.utils.tensorboard import SummaryWriter
-
-
-current_time = datetime.datetime.now()
-writer = SummaryWriter("Base_solution/runs")
-directory_name = f"Base_solution/DDPG_checkpoints/{current_time}"
-os.makedirs(directory_name)
 
 
 bath_size = 128
@@ -36,14 +27,12 @@ action_max = env.action_space.high[0]
 agent = DDPG(obs_shape, action_shape, action_min=action_min, action_max=action_max, bath_size=bath_size, start_learning=start_learning,
              noise_decrease=1 / (episode_n * trajectory_len), polyak=0.05, buffer_size=10**6, critic_lr=2e-3, actor_lr=1e-3, noise_scaler=0.3)
 
-log_data = {'Total_reward': []}
-
 
 cur_episode = 0
 step = 0
 
 agent.load_models(
-    'Base_solution/DDPG_checkpoints/best_model/episode1500')
+    'Base_solution/DDPG_checkpoints/200_episodes/episode240')
 
 for episode in range(episode_n):
     total_reward = 0
@@ -64,4 +53,3 @@ for episode in range(episode_n):
         state = next_state
         time.sleep(0.1)
     print(total_reward)
-writer.close()
