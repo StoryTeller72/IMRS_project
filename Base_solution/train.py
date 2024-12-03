@@ -18,7 +18,7 @@ os.makedirs(directory_name)
 
 
 bath_size = 128
-episode_n = 1_500
+episode_n = 250
 trajectory_len = 50
 start_learning = 80
 checkpoint_episode_interval = 20
@@ -40,7 +40,6 @@ agent = DDPG(obs_shape, action_shape, action_min=action_min, action_max=action_m
 log_data = {'Total_reward': []}
 
 
-cur_episode = 0
 step = 0
 
 
@@ -64,9 +63,9 @@ for episode in range(episode_n):
 
         step += 1
         state = next_state
-    cur_episode += 1
+
     log_data['Total_reward'].append(total_reward)
-    if cur_episode % checkpoint_episode_interval == 0:
+    if episode % checkpoint_episode_interval == 0:
         writer.add_scalar('Max_total_reward', max(
             log_data['Total_reward']), step)
         writer.add_scalar('Min_total_reward', min(
@@ -78,12 +77,6 @@ for episode in range(episode_n):
             writer.add_scalar('Q_loss', Q_los, step)
             writer.add_scalar('Pi_Loss', policy_loss, step)
         writer.flush()
-        torch.save({
-            'policy_model': agent.policy.state_dict(),
-            'target_policy_model': agent.policy_target.state_dict(),
-            'Q_fun_model': agent.Q_fun.state_dict(),
-            'Q_fun_target_model': agent.Q_fun_target.state_dict()
-
-        }, directory_name + '/episode' + str(cur_episode))
+        agent.save_models(directory_name, episode)
     print(total_reward)
 writer.close()

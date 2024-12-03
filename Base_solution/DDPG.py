@@ -135,6 +135,15 @@ class DDPG():
             return (policy_loss, Q_loss)
         return (None, None)
 
+    def save_models(self, path, check_point_number):
+        torch.save({
+            'policy_model': self.policy.state_dict(),
+            'target_policy_model': self.policy_target.state_dict(),
+            'Q_fun_model': self.Q_fun.state_dict(),
+            'Q_fun_target_model': self.Q_fun_target.state_dict()
+
+        }, path + '/episode' + str(check_point_number))
+
     def load_models(self, PATH):
         checkpoint = torch.load(PATH, weights_only=True)
         self.policy.load_state_dict(checkpoint['policy_model'])
