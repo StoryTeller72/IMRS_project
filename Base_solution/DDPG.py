@@ -6,6 +6,7 @@ import random
 from Noise import OUNoise
 from collections import deque
 import os
+import datetime
 
 
 class Actor(nn.Module):
@@ -44,42 +45,52 @@ class Critic(nn.Module):
 
 
 class DDPG():
-    def __init__(self, observation_space_dim,  action_space_dim, noise_decrease, start_learning=80, write_intervals=80, checkpoint_interval=100, polyak=1e-2, bath_size=512, actor_lr=1e-3, critic_lr=1e-3, gamma=0.99, noise_scaler=1.0, mu=0, theta=0.15, sigma=0.3,  buffer_size=15_000):
+    def __init__(self, observation_space_dim,  action_space_dim, noise_decrease, action_min, action_max, grad_steps=1, start_learning=80, write_intervals=80, checkpoint_interval=100, polyak=1e-2, bath_size=512, actor_lr=1e-3, critic_lr=1e-3, gamma=0.99, noise_scaler=1.0, sigma=0.3,  buffer_size=15_000, train_mode=True):
         self.observation_dim = observation_space_dim
         self.action_dim = action_space_dim
+        self.action_min = action_min
+        self.action_max = action_max
+
         self.buffer_size = buffer_size
         self.experience_buffer = deque(maxlen=self.buffer_size)
         self.bath_size = bath_size
         self.start_learning = start_learning
+        self.grad_steps = grad_steps
+
+        self.train_mode = train_mode
 
         self.policy = Actor(self.observation_dim, self.action_dim)
         self.policy_target = copy.deepcopy(self.policy)
         self.Q_fun = Critic(self.observation_dim, self.action_dim)
         self.Q_fun_target = copy.deepcopy(self.Q_fun)
         self.actor_lr = actor_lr
+
+        # torch.nn.init.normal_(self.policy, mean=0, std=0.1)
+        # torch.nn.init.normal_(self.policy_target, mean=0, std=0.1)
+        # torch.nn.init.normal_(self.Q_fun, mean=0, std=0.1)
+        # torch.nn.init.normal_(self.Q_fun_target, mean=0, std=0.1)
+
         self.critic_lr = critic_lr
 
         self.polyak = polyak
         self.noise_scaler = noise_scaler
         self.noise_decrease = noise_decrease
 
-        self.mu = mu
-        self.theta = theta
         self.sigma = sigma
 
         self.gamma = gamma
-        self.noise = OUNoise(self.action_dim, self.mu, self.theta, self.sigma)
         self.q_optimizer = torch.optim.Adam(
             self.Q_fun.parameters(), lr=critic_lr)
         self.policy_optimizer = torch.optim.Adam(
             self.policy.parameters(), lr=actor_lr)
 
     def get_action(self, state):
-        pred_action = self.policy(torch.FloatTensor(state))
-        action = pred_action + self.noise_scaler * \
-            torch.FloatTensor(self.noise.sample())
+        action = self.policy(torch.FloatTensor(state))
+        if self.train_mode:
+            action += torch.normal(0, self.sigma, (1, 3)).squeeze()
+        action = torch.clamp(action, self.action_min, self.action_max)
         self.noise_scaler = max(0, self.noise_decrease - self.noise_decrease)
-        return torch.clamp(action, -1.0, 1.0)
+        return torch.clamp(action, self.action_min, self.action_max)
 
     def update(self, target_model, model, optimizer, loss):
         optimizer.zero_grad()
@@ -123,3 +134,10 @@ class DDPG():
                         self.policy_optimizer, policy_loss)
             return (policy_loss, Q_loss)
         return (None, None)
+
+    def load_models(self, PATH):
+        checkpoint = torch.load(PATH, weights_only=True)
+        self.policy.load_state_dict(checkpoint['policy_model'])
+        self.policy_target.load_state_dict(checkpoint['target_policy_model'])
+        self.Q_fun.load_state_dict(checkpoint['Q_fun_model'])
+        self.Q_fun.load_state_dict(checkpoint['Q_fun_target_model'])

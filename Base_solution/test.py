@@ -18,12 +18,11 @@ os.makedirs(directory_name)
 
 
 bath_size = 128
-episode_n = 1_500
+episode_n = 5
 trajectory_len = 50
 start_learning = 80
-checkpoint_episode_interval = 20
 
-env = gym.make('PandaReachDense-v3')
+env = gym.make('PandaReachDense-v3', render_mode='human')
 
 obs_shape = env.observation_space['observation'].shape[0] + \
     env.observation_space['achieved_goal'].shape[0] + \
@@ -43,6 +42,8 @@ log_data = {'Total_reward': []}
 cur_episode = 0
 step = 0
 
+agent.load_models(
+    'Base_solution/DDPG_checkpoints/best_model/episode1500')
 
 for episode in range(episode_n):
     total_reward = 0
@@ -59,31 +60,8 @@ for episode in range(episode_n):
                                      next_observation['achieved_goal'], next_observation['desired_goal']], axis=0)
         total_reward += reward
 
-        policy_loss, Q_los = agent.fit(state, action, reward,
-                                       terminated, next_state, step)
-
         step += 1
         state = next_state
-    cur_episode += 1
-    log_data['Total_reward'].append(total_reward)
-    if cur_episode % checkpoint_episode_interval == 0:
-        writer.add_scalar('Max_total_reward', max(
-            log_data['Total_reward']), step)
-        writer.add_scalar('Min_total_reward', min(
-            log_data['Total_reward']), step)
-        writer.add_scalar('Mean_total_reward', sum(
-            log_data['Total_reward']) / len(log_data['Total_reward']), step)
-        log_data['Total_reward'] = []
-        if policy_loss and Q_los:
-            writer.add_scalar('Q_loss', Q_los, step)
-            writer.add_scalar('Pi_Loss', policy_loss, step)
-        writer.flush()
-        torch.save({
-            'policy_model': agent.policy.state_dict(),
-            'target_policy_model': agent.policy_target.state_dict(),
-            'Q_fun_model': agent.Q_fun.state_dict(),
-            'Q_fun_target_model': agent.Q_fun_target.state_dict()
-
-        }, directory_name + '/episode' + str(cur_episode))
+        time.sleep(0.1)
     print(total_reward)
 writer.close()
