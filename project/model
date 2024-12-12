@@ -20,10 +20,10 @@
                         <joint name='R_2' axis='0 1 0' limited='true' range='-70 70'/>
                         <geom type='cylinder' size='1 1' rgba=".9 .1 .1 1"  euler='90 0 0'/>
 
-                        <body name='link_2' pos='3 .5 0'>
-                            <joint name='P_1' type='slide' axis='1 0 0' range="-6 0" limited="true"/>
+                        <body name='link_2' pos='0 .5 0'>
+                            <joint name='P_1' type='slide' axis='1 0 0' range="-4 5" limited="true"/>
                             <geom type='box' size='.3 .3 5' rgba=".2 .2 .9 1"  euler='0 90 0 '/>
-                            <site name='end_effector' pos="5 0 0" size='.3' rgba='.1 .9 .1 1'/>
+                            <site name='end_effector' pos="5 0 0" size='.7' rgba='.1 .9 .1 1'/>
                         </body>
 
                     </body>
@@ -32,7 +32,7 @@
  
             </body>
         </body>
-        <site name='goal' pos='12 0 10'size='.3' rgba=".9 .1 .1 1"/>
+        <site name='goal' pos='12 0 10'size='.6' rgba=".9 .1 .1 1"/>
 
     </worldbody>
 
